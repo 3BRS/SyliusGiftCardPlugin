@@ -22,14 +22,11 @@ class GiftCard implements GiftCardInterface
 
     protected ?int $id = null;
 
-    protected ?OrderItemUnitInterface $orderItemUnit = null;
+    protected ?OrderItemInterface $orderItem = null;
 
     protected ?CustomerInterface $customer = null;
 
-    /**
-     * @var Collection|OrderInterface[]
-     * @psalm-var Collection<array-key, OrderInterface>
-     */
+    /** @var Collection<array-key, OrderInterface> */
     protected Collection $appliedOrders;
 
     protected ?string $code = null;
@@ -77,39 +74,32 @@ class GiftCard implements GiftCardInterface
 
     public function isDeletable(): bool
     {
-        return null === $this->orderItemUnit;
+        return null === $this->orderItem;
     }
 
-    public function getOrderItemUnit(): ?OrderItemUnitInterface
+    public function getOrderItem(): ?OrderItemInterface
     {
-        return $this->orderItemUnit;
+        return $this->orderItem;
     }
 
-    public function setOrderItemUnit(OrderItemUnitInterface $orderItemUnit): void
+    public function setOrderItem(OrderItemInterface $orderItem): void
     {
-        if ($this->orderItemUnit === $orderItemUnit) {
-            return;
-        }
+        $this->orderItem = $orderItem;
 
-        $this->orderItemUnit = $orderItemUnit;
-
-        $orderItemUnit->setGiftCard($this);
+//        $orderItem->setGiftCard($this); todo do we need the inverse side?
     }
 
     public function getOrder(): ?OrderInterface
     {
-        $orderItemUnit = $this->getOrderItemUnit();
-        if (null === $orderItemUnit) {
+        $orderItem = $this->getOrderItem();
+        if (null === $orderItem) {
             return null;
         }
 
         /** @var OrderInterface|null $order */
-        $order = $orderItemUnit->getOrderItem()->getOrder();
-        if (null === $order) {
-            return null;
-        }
+        $order = $orderItem->getOrder();
 
-        return $order;
+        return $order ?? null;
     }
 
     public function getCustomer(): ?CustomerInterface

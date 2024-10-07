@@ -8,9 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\EntityManagerInterface;
 use Setono\SyliusGiftCardPlugin\EmailManager\GiftCardEmailManagerInterface;
 use Setono\SyliusGiftCardPlugin\Model\GiftCardInterface;
-use Setono\SyliusGiftCardPlugin\Model\OrderItemUnitInterface;
 use Setono\SyliusGiftCardPlugin\Model\ProductInterface;
-use Sylius\Component\Core\Model\CustomerInterface;
 use Sylius\Component\Core\Model\OrderInterface;
 use Sylius\Component\Core\Model\OrderItemInterface;
 use Webmozart\Assert\Assert;
@@ -31,31 +29,6 @@ final class OrderGiftCardOperator implements OrderGiftCardOperatorInterface
     ) {
         $this->giftCardManager = $giftCardManager;
         $this->giftCardOrderEmailManager = $giftCardOrderEmailManager;
-    }
-
-    public function associateToCustomer(OrderInterface $order): void
-    {
-        $items = self::getOrderItemsThatAreGiftCards($order);
-
-        if (count($items) === 0) {
-            return;
-        }
-
-        /** @var CustomerInterface|null $customer */
-        $customer = $order->getCustomer();
-        Assert::isInstanceOf($customer, CustomerInterface::class);
-
-        foreach ($items as $item) {
-            /** @var OrderItemUnitInterface $unit */
-            foreach ($item->getUnits() as $unit) {
-                $giftCard = $unit->getGiftCard();
-                Assert::notNull($giftCard);
-
-                $giftCard->setCustomer($customer);
-            }
-        }
-
-        $this->giftCardManager->flush();
     }
 
     public function enable(OrderInterface $order): void

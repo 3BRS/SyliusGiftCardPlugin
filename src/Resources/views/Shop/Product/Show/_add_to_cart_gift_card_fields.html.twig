@@ -1,0 +1,4 @@
+{% if form.amount is defined and form.customMessage is defined %}
+    {{ form_row(form.amount, sylius_test_form_attribute('gift-card-amount-input')) }}
+    {{ form_row(form.customMessage, sylius_test_form_attribute('gift-card-custom-message-input')) }}
+{% endif %}

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Setono\SyliusGiftCardPlugin\Provider;
 
 use Doctrine\Persistence\ManagerRegistry;
-use Setono\DoctrineObjectManagerTrait\ORM\ORMManagerTrait;
+use Setono\Doctrine\ORMTrait;
 use Setono\SyliusGiftCardPlugin\Factory\GiftCardConfigurationFactoryInterface;
 use Setono\SyliusGiftCardPlugin\Model\GiftCardConfigurationInterface;
 use Setono\SyliusGiftCardPlugin\Model\GiftCardInterface;
@@ -21,7 +21,7 @@ use Webmozart\Assert\Assert;
 
 final class GiftCardConfigurationProvider implements GiftCardConfigurationProviderInterface
 {
-    use ORMManagerTrait;
+    use ORMTrait;
 
     private GiftCardConfigurationRepositoryInterface $giftCardConfigurationRepository;
 

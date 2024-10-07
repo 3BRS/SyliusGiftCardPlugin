@@ -22,4 +22,11 @@ interface OrderInterface extends BaseOrderInterface
     public function removeGiftCard(GiftCardInterface $giftCard): void;
 
     public function hasGiftCard(GiftCardInterface $giftCard): bool;
+
+    /**
+     * Returns a list of gift cards that were bought on this order
+     *
+     * @return list<GiftCardInterface>
+     */
+    public function getBoughtGiftCards(): array;
 }

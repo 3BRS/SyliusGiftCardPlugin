@@ -29,9 +29,6 @@ sylius_order:
         order_item:
             classes:
                 model: Setono\SyliusGiftCardPlugin\Tests\Application\Model\OrderItem
-        order_item_unit:
-            classes:
-                model: Setono\SyliusGiftCardPlugin\Tests\Application\Model\OrderItemUnit
 
 sylius_product:
     resources:

@@ -31,13 +31,13 @@ interface GiftCardInterface extends ResourceInterface, ToggleableInterface, Code
     public function isDeletable(): bool;
 
     /**
-     * This is the order item unit where this gift card was bought
+     * This is the order item where this gift card was bought.
      * If it's null it means that the gift card was not bought,
      * but created in the backend or through API
      */
-    public function getOrderItemUnit(): ?OrderItemUnitInterface;
+    public function getOrderItem(): ?OrderItemInterface;
 
-    public function setOrderItemUnit(OrderItemUnitInterface $orderItemUnit): void;
+    public function setOrderItem(OrderItemInterface $orderItem): void;
 
     /**
      * This is a helper method that will return the order where the gift was bought
@@ -79,8 +79,7 @@ interface GiftCardInterface extends ResourceInterface, ToggleableInterface, Code
     /**
      * Orders where this gift card was applied
      *
-     * @return Collection|OrderInterface[]
-     * @psalm-return Collection<array-key, OrderInterface>
+     * @return Collection<array-key, OrderInterface>
      */
     public function getAppliedOrders(): Collection;
 

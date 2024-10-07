@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Setono\SyliusGiftCardPlugin\Form\Extension;
 
-use Doctrine\ORM\EntityManagerInterface;
-use Setono\SyliusGiftCardPlugin\Factory\GiftCardFactoryInterface;
-use Setono\SyliusGiftCardPlugin\Form\Type\AddToCartGiftCardInformationType;
-use Setono\SyliusGiftCardPlugin\Model\OrderItemUnitInterface;
+use Setono\SyliusGiftCardPlugin\Model\OrderItemInterface;
 use Setono\SyliusGiftCardPlugin\Model\ProductInterface;
-use Setono\SyliusGiftCardPlugin\Order\AddToCartCommandInterface;
 use Sylius\Bundle\CoreBundle\Form\Type\Order\AddToCartType;
+use Sylius\Bundle\MoneyBundle\Form\Type\MoneyType;
+use Sylius\Bundle\OrderBundle\Controller\AddToCartCommandInterface;
+use Sylius\Component\Channel\Context\ChannelContextInterface;
+use Sylius\Component\Core\Model\ChannelInterface;
+use Sylius\Component\Core\Model\ProductVariantInterface;
+use Sylius\Component\Currency\Context\CurrencyContextInterface;
 use Symfony\Component\Form\AbstractTypeExtension;
+use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormEvent;
 use Symfony\Component\Form\FormEvents;
@@ -19,16 +22,10 @@ use Webmozart\Assert\Assert;
 
 final class AddToCartTypeExtension extends AbstractTypeExtension
 {
-    private GiftCardFactoryInterface $giftCardFactory;
-
-    private EntityManagerInterface $giftCardManager;
-
     public function __construct(
-        GiftCardFactoryInterface $giftCardFactory,
-        EntityManagerInterface $giftCardManager,
+        private readonly ChannelContextInterface $channelContext,
+        private readonly CurrencyContextInterface $currencyContext,
     ) {
-        $this->giftCardFactory = $giftCardFactory;
-        $this->giftCardManager = $giftCardManager;
     }
 
     public static function getExtendedTypes(): iterable
@@ -40,82 +37,90 @@ final class AddToCartTypeExtension extends AbstractTypeExtension
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder->addEventListener(FormEvents::PRE_SET_DATA, [$this, 'reworkFormForGiftCard']);
+        $builder->addEventListener(FormEvents::PRE_SET_DATA, [$this, 'addFormFields']);
 
         $builder->addEventListener(FormEvents::POST_SUBMIT, [$this, 'populateCartItem']);
     }
 
-    public function reworkFormForGiftCard(FormEvent $event): void
+    public function addFormFields(FormEvent $event): void
     {
-        /** @var AddToCartCommandInterface|null $data */
         $data = $event->getData();
-        if (null === $data) {
-            return;
-        }
-
-        $variant = $data->getCartItem()->getVariant();
-        if (null === $variant) {
-            return;
-        }
-
-        /** @var ProductInterface|null $product */
-        $product = $variant->getProduct();
-        if (null === $product) {
-            return;
-        }
-
-        // If the product is a gift card, we add the GiftCardInformation fields
-        if ($product->isGiftCard()) {
-            $form = $event->getForm();
-            $form->add('giftCardInformation', AddToCartGiftCardInformationType::class, [
-                'product' => $product,
-            ]);
-        }
-    }
-
-    public function populateCartItem(FormEvent $event): void
-    {
-        /** @var AddToCartCommandInterface|null $data */
-        $data = $event->getData();
-        if (null === $data) {
+        if (!$data instanceof AddToCartCommandInterface) {
             return;
         }
 
         $cartItem = $data->getCartItem();
-        /** @var ProductInterface|null $product */
+        if (!$cartItem instanceof OrderItemInterface) {
+            return;
+        }
+
+        $variant = $cartItem->getVariant();
+        if (!$variant instanceof ProductVariantInterface) {
+            return;
+        }
+
+        $product = $variant->getProduct();
+        if (!$product instanceof ProductInterface || !$product->isGiftCard()) {
+            return;
+        }
+
+        $event
+            ->getForm()
+            ->add('amount', MoneyType::class, [
+                'label' => 'setono_sylius_gift_card.form.add_to_cart.gift_card_information.amount',
+                'currency' => $this->currencyContext->getCurrencyCode(),
+                'data' => $this->getDefaultAmount($variant),
+                'mapped' => false,
+            ])
+            ->add('customMessage', TextareaType::class, [
+                'required' => false,
+                'label' => 'setono_sylius_gift_card.form.add_to_cart.gift_card_information.custom_message',
+                'attr' => [
+                    'placeholder' => 'setono_sylius_gift_card.form.add_to_cart.gift_card_information.custom_message_placeholder',
+                ],
+                'mapped' => false,
+            ])
+        ;
+    }
+
+    public function populateCartItem(FormEvent $event): void
+    {
+        $data = $event->getData();
+        if (!$data instanceof AddToCartCommandInterface) {
+            return;
+        }
+
+        $cartItem = $data->getCartItem();
+        if (!$cartItem instanceof OrderItemInterface) {
+            return;
+        }
+
         $product = $cartItem->getProduct();
-        if (null === $product) {
+        if (!$product instanceof ProductInterface || !$product->isGiftCard()) {
             return;
         }
 
-        if (!$product->isGiftCard()) {
+        $amount = $event->getForm()->get('amount')->getData();
+        $customMessage = $event->getForm()->get('customMessage')->getData();
+
+        if (!is_int($amount)) {
             return;
         }
 
-        $giftCardInformation = $data->getGiftCardInformation();
-        if ($product->isGiftCardAmountConfigurable()) {
-            $cartItem->setUnitPrice($giftCardInformation->getAmount());
-            $cartItem->setImmutable(true);
-        } else {
-            $channel = $data->getCart()->getChannel();
-            Assert::notNull($channel);
-            $variant = $data->getCartItem()->getVariant();
-            Assert::notNull($variant);
-            $channelPricing = $variant->getChannelPricingForChannel($channel);
-            Assert::notNull($channelPricing);
-            $price = $channelPricing->getPrice();
-            Assert::notNull($price);
-            $cartItem->setUnitPrice($price);
-        }
+        $cartItem->setUnitPrice($amount);
+        $cartItem->setImmutable(true);
+        $cartItem->setDetails([
+            'giftCardMessage' => $customMessage,
+        ]);
+    }
 
-        $cart = $data->getCart();
-        /** @var OrderItemUnitInterface $unit */
-        foreach ($cartItem->getUnits() as $unit) {
-            $giftCard = $this->giftCardFactory->createFromOrderItemUnitAndCart($unit, $cart);
-            $giftCard->setCustomMessage($giftCardInformation->getCustomMessage());
+    private function getDefaultAmount(ProductVariantInterface $variant): int
+    {
+        $channel = $this->channelContext->getChannel();
+        Assert::isInstanceOf($channel, ChannelInterface::class);
 
-            // As the common flow for any add to cart action will flush later. Do not flush here.
-            $this->giftCardManager->persist($giftCard);
-        }
+        $channelPricing = $variant->getChannelPricingForChannel($channel);
+
+        return $channelPricing?->getPrice() ?? 100;
     }
 }

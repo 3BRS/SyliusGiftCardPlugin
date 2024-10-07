@@ -66,4 +66,24 @@ trait OrderTrait
     {
         return $this->giftCards->contains($giftCard);
     }
+
+    public function getBoughtGiftCards(): array
+    {
+        $giftCards = [];
+
+        foreach ($this->getItems() as $item) {
+            if(!$item instanceof OrderItemInterface) {
+                continue;
+            }
+
+            $product = $item->getProduct();
+            if (!$product instanceof ProductInterface ||  !$product->isGiftCard()) {
+                continue;
+            }
+
+            $giftCards[] = $item->getGiftCard();
+        }
+
+        return $giftCards;
+    }
 }

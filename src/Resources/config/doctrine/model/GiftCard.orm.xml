@@ -30,11 +30,11 @@
             <join-column name="channel_id" referenced-column-name="id" nullable="false"/>
         </many-to-one>
 
-        <!-- Refers to the order item unit where this gift card was bought -->
-        <one-to-one field="orderItemUnit" target-entity="Sylius\Component\Order\Model\OrderItemUnitInterface"
-                    inversed-by="giftCard">
-            <join-column name="order_item_unit_id" referenced-column-name="id" on-delete="CASCADE"/>
-        </one-to-one>
+        <!-- Refers to the order item where this gift card was bought -->
+        <many-to-one field="orderItem" target-entity="Sylius\Component\Order\Model\OrderItemInterface"
+                    inversed-by="boughtGiftCards">
+            <join-column name="order_item_id" referenced-column-name="id" on-delete="CASCADE"/>
+        </many-to-one>
 
         <!-- A list of orders where this gift card was applied / used -->
         <many-to-many field="appliedOrders" target-entity="Sylius\Component\Order\Model\OrderInterface"

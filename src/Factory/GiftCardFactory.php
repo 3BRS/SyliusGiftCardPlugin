@@ -8,12 +8,14 @@ use DateTimeImmutable;
 use DateTimeInterface;
 use Setono\SyliusGiftCardPlugin\Generator\GiftCardCodeGeneratorInterface;
 use Setono\SyliusGiftCardPlugin\Model\GiftCardInterface;
-use Setono\SyliusGiftCardPlugin\Model\OrderItemUnitInterface;
+use Setono\SyliusGiftCardPlugin\Model\OrderItemInterface;
+use Setono\SyliusGiftCardPlugin\Model\ProductInterface;
 use Setono\SyliusGiftCardPlugin\Provider\GiftCardConfigurationProviderInterface;
 use Sylius\Bundle\ShippingBundle\Provider\DateTimeProvider;
 use Sylius\Component\Core\Model\ChannelInterface;
 use Sylius\Component\Core\Model\CustomerInterface;
 use Sylius\Component\Core\Model\OrderInterface;
+use Sylius\Component\Core\Model\OrderItemUnitInterface;
 use Sylius\Component\Currency\Context\CurrencyContextInterface;
 use Sylius\Component\Resource\Factory\FactoryInterface;
 use Webmozart\Assert\Assert;
@@ -32,8 +34,10 @@ final class GiftCardFactory implements GiftCardFactoryInterface
 
     public function createNew(): GiftCardInterface
     {
-        /** @var GiftCardInterface $giftCard */
+        /** @var GiftCardInterface|object $giftCard */
         $giftCard = $this->decoratedFactory->createNew();
+        Assert::isInstanceOf($giftCard, GiftCardInterface::class);
+
         $giftCard->setCode($this->giftCardCodeGenerator->generate());
 
         return $giftCard;
@@ -67,21 +71,52 @@ final class GiftCardFactory implements GiftCardFactoryInterface
         return $giftCard;
     }
 
-    public function createFromOrderItemUnit(OrderItemUnitInterface $orderItemUnit): GiftCardInterface
+    public function createFromOrder(OrderInterface $order): array
     {
-        /** @var OrderInterface|null $order */
-        $order = $orderItemUnit->getOrderItem()->getOrder();
+        $giftCards = [];
+
+        foreach ($order->getItems() as $orderItem) {
+            $product = $orderItem->getProduct();
+            if (!$product instanceof ProductInterface || !$product->isGiftCard()) {
+                continue;
+            }
+
+            $giftCards[] = $this->createFromOrderItem($orderItem);
+        }
+
+        return array_merge(...$giftCards);
+    }
+
+    public function createFromOrderItem(OrderItemInterface $orderItem): array
+    {
+        /** @var OrderInterface $order */
+        $order = $orderItem->getOrder();
         Assert::isInstanceOf($order, OrderInterface::class);
 
         /** @var CustomerInterface|null $customer */
         $customer = $order->getCustomer();
         Assert::isInstanceOf($customer, CustomerInterface::class);
 
-        $giftCard = $this->createFromOrderItemUnitAndCart($orderItemUnit, $order);
-        $giftCard->setCustomer($customer);
-        $giftCard->setOrigin(GiftCardInterface::ORIGIN_ORDER);
+        /** @var ChannelInterface $channel */
+        $channel = $order->getChannel();
+        Assert::isInstanceOf($channel, ChannelInterface::class);
 
-        return $giftCard;
+        $currencyCode = $order->getCurrencyCode();
+        Assert::notNull($currencyCode);
+
+        $giftCards = [];
+
+        for ($i = 0; $i < $orderItem->getQuantity(); ++$i) {
+            $giftCard = $this->createForChannel($channel);
+            $giftCard->setCustomer($customer);
+            $giftCard->setOrigin(GiftCardInterface::ORIGIN_ORDER);
+            $giftCard->setCurrencyCode($currencyCode);
+            $giftCard->setAmount($orderItem->getUnitPrice());
+
+            $giftCards[] = $giftCard;
+        }
+
+        return $giftCards;
     }
 
     public function createFromOrderItemUnitAndCart(
@@ -94,7 +129,7 @@ final class GiftCardFactory implements GiftCardFactoryInterface
         Assert::notNull($currencyCode);
 
         $giftCard = $this->createForChannel($channel);
-        $giftCard->setOrderItemUnit($orderItemUnit);
+        //$giftCard->setOrderItemUnit($orderItemUnit); todo
         $giftCard->setAmount($orderItemUnit->getTotal());
         $giftCard->setCurrencyCode($currencyCode);
         $giftCard->setChannel($channel);
